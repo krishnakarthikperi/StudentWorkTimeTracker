@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Student Work Hours Analytics & Planner V4</title>
+    <title>Student Werk Tracker V4.2</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -18,10 +18,9 @@
         body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg-main); color: var(--text-main); padding: 2rem 1rem; line-height: 1.5; }
         .container { max-width: 1200px; margin: 0 auto; }
         
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
-        h1 { font-size: 1.75rem; color: var(--primary); }
-        h2 { font-size: 1.25rem; margin-bottom: 1rem; }
-
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
+        h1 { font-size: 1.75rem; color: var(--primary); margin-bottom: 0.25rem; }
+        
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
         .kpi-card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
         .kpi-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
@@ -39,12 +38,13 @@
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
         .form-group { margin-bottom: 0.5rem; }
         label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; color: var(--text-muted); }
-        input[type="text"], input[type="date"], input[type="time"], select { width: 100%; background-color: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); border-radius: 4px; padding: 0.5rem; }
+        input[type="text"], input[type="date"], input[type="time"], input[type="number"], select { width: 100%; background-color: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); border-radius: 4px; padding: 0.5rem; }
         
         button { background-color: var(--primary); color: var(--bg-main); border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; cursor: pointer; }
         button:hover { background-color: var(--primary-hover); }
         .btn-outline { background-color: transparent; border: 1px solid var(--border); color: var(--text-main); }
-        .btn-danger { background-color: var(--danger); color: white; padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        .btn-danger { background-color: var(--danger); color: white; }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
         .btn-edit { background-color: var(--warning); color: #000; padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-right: 0.25rem; }
 
         table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -55,7 +55,6 @@
         .badge-hiwi { background: rgba(167, 139, 250, 0.15); color: var(--exempt); }
         .badge-planned { background: rgba(244, 114, 182, 0.15); color: var(--planned); border: 1px dashed var(--planned); }
 
-        /* Calendar Grid */
         .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .calendar-grid { display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 4px; }
         .cal-day-header { text-align: center; font-weight: bold; color: var(--text-muted); padding: 0.5rem; }
@@ -80,17 +79,19 @@
 <body>
 
 <div class="container">
-<header>
+    <header>
         <div>
-            <h1>Pro Visa Analytics & Planner <span style="font-size:1rem; color:var(--success);">V4 (Cloud Synced)</span></h1>
-            <p style="color: var(--text-muted);">Data is saved to your Proxmox server's SQLite database.</p>
+            <h1>Student Werk Tracker <span style="font-size:1rem; color:var(--success);">V4.2</span></h1>
+            <p style="color: var(--text-muted); margin: 0;">Precision Data Sync & Mass Wipe Enabled</p>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button class="btn-outline" onclick="exportData()">Export Backup</button>
             <button class="btn-outline" onclick="document.getElementById('importFile').click()">Import JSON</button>
             <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+            <button class="btn-danger" onclick="wipeDatabase()">Wipe Database</button>
         </div>
     </header>
+
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">Yearly Visa Days Used</div>
@@ -133,14 +134,29 @@
                 <label>Date</label>
                 <input type="date" id="shiftDate" required>
             </div>
-            <div class="form-group">
+
+            <div class="form-group" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+                <label>Input Mode</label>
+                <select id="inputMode" onchange="toggleInputMode()">
+                    <option value="time">Start & End Times</option>
+                    <option value="hours">Total Hours (Manual Entry)</option>
+                </select>
+            </div>
+
+            <div class="form-group time-mode">
                 <label>Start Time</label>
-                <input type="time" id="startTime" value="09:00" required>
+                <input type="time" id="startTime" value="09:00">
             </div>
-            <div class="form-group">
+            <div class="form-group time-mode">
                 <label>End Time</label>
-                <input type="time" id="endTime" value="17:00" required>
+                <input type="time" id="endTime" value="17:00">
             </div>
+
+            <div class="form-group hours-mode" style="display: none;">
+                <label>Total Hours Worked</label>
+                <input type="number" id="manualHours" step="0.01" min="0.01" max="24" value="8.00">
+            </div>
+
             <div class="form-group" style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
                 <input type="checkbox" id="isBreak" style="width: auto; transform: scale(1.2);">
                 <label for="isBreak" style="margin: 0; cursor: pointer; color: var(--warning); font-weight: bold;">Semester Break / Lecture-free Period (Exempt from 20h limit)</label>
@@ -169,8 +185,7 @@
             <div class="cal-day-header">Mon</div><div class="cal-day-header">Tue</div><div class="cal-day-header">Wed</div>
             <div class="cal-day-header">Thu</div><div class="cal-day-header">Fri</div><div class="cal-day-header">Sat</div><div class="cal-day-header">Sun</div>
         </div>
-        <div class="calendar-grid" id="calDaysGrid">
-            </div>
+        <div class="calendar-grid" id="calDaysGrid"></div>
     </div>
 
     <div id="matrix" class="tab-content panel">
@@ -190,7 +205,7 @@
                     <th>Date</th>
                     <th>Status</th>
                     <th>Type</th>
-                    <th>Hours</th>
+                    <th>Time / Hours</th>
                     <th>Visa Impact</th>
                     <th>Break?</th>
                     <th>Action</th>
@@ -214,7 +229,22 @@
     let editingId = null;
     let weeklyTotals = {};
 
-    // --- API CALLS (Database Sync) ---
+    // --- UI TOGGLES ---
+    function toggleInputMode() {
+        const mode = document.getElementById('inputMode').value;
+        const timeEls = document.querySelectorAll('.time-mode');
+        const hourEls = document.querySelectorAll('.hours-mode');
+        
+        if (mode === 'time') {
+            timeEls.forEach(el => el.style.display = 'block');
+            hourEls.forEach(el => el.style.display = 'none');
+        } else {
+            timeEls.forEach(el => el.style.display = 'none');
+            hourEls.forEach(el => el.style.display = 'block');
+        }
+    }
+
+    // --- API CALLS ---
     async function loadData() {
         try {
             const response = await fetch('/api/shifts');
@@ -222,7 +252,6 @@
             renderEngine();
         } catch (error) {
             console.error("Failed to load data:", error);
-            alert("Could not connect to the database server.");
         }
     }
 
@@ -236,7 +265,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            await loadData(); // Reload from DB to ensure local state sync
+            await loadData();
         } catch (error) {
             console.error("Save error:", error);
             alert("Failed to save to server.");
@@ -253,15 +282,40 @@
         }
     }
 
+    async function wipeDatabase() {
+        const confirmation = prompt("DANGER: Type 'DELETE' to confirm you want to permanently erase the entire database.");
+        if (confirmation === 'DELETE') {
+            try {
+                await fetch('/api/shifts', { method: 'DELETE' });
+                await loadData();
+                alert("Database successfully cleared.");
+            } catch (error) {
+                console.error("Clear DB error:", error);
+            }
+        }
+    }
+
     // --- FORM SUBMISSION ---
     document.getElementById('shiftForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        const mode = document.getElementById('inputMode').value;
+        let start = '', end = '', hours = 0;
+
+        if (mode === 'time') {
+            start = document.getElementById('startTime').value;
+            end = document.getElementById('endTime').value;
+            hours = computeHours(start, end);
+        } else {
+            hours = parseFloat(document.getElementById('manualHours').value);
+        }
+
         const payload = {
             status: document.getElementById('statusType').value,
             type: document.getElementById('jobType').value,
             date: document.getElementById('shiftDate').value,
-            start: document.getElementById('startTime').value,
-            end: document.getElementById('endTime').value,
+            start: start,
+            end: end,
+            hours: hours,
             isBreak: document.getElementById('isBreak').checked
         };
 
@@ -274,12 +328,21 @@
     function editShift(id) {
         const s = shifts.find(x => x.id === id);
         if (!s) return;
+        
         document.getElementById('statusType').value = s.status;
         document.getElementById('jobType').value = s.type;
         document.getElementById('shiftDate').value = s.date;
-        document.getElementById('startTime').value = s.start;
-        document.getElementById('endTime').value = s.end;
         document.getElementById('isBreak').checked = s.isBreak || false;
+        
+        if (s.start && s.end) {
+            document.getElementById('inputMode').value = 'time';
+            document.getElementById('startTime').value = s.start;
+            document.getElementById('endTime').value = s.end;
+        } else {
+            document.getElementById('inputMode').value = 'hours';
+            document.getElementById('manualHours').value = s.hours;
+        }
+        toggleInputMode();
         
         editingId = id;
         document.getElementById('submitBtn').textContent = 'Update Shift on Server';
@@ -292,10 +355,13 @@
         document.getElementById('submitBtn').textContent = 'Save Shift to Server';
         document.getElementById('cancelEditBtn').style.display = 'none';
         document.getElementById('shiftForm').reset();
+        document.getElementById('inputMode').value = 'time';
+        toggleInputMode();
     }
 
     // --- HELPER FUNCTIONS ---
     function computeHours(start, end) {
+        if (!start || !end) return 0;
         const [sh, sm] = start.split(':').map(Number);
         const [eh, em] = end.split(':').map(Number);
         let diff = (eh + em/60) - (sh + sm/60);
@@ -311,13 +377,34 @@
         return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
     }
 
+    function getWeekDateRange(yearWeek) {
+        const parts = yearWeek.split('-W');
+        const year = parseInt(parts[0], 10);
+        const week = parseInt(parts[1], 10);
+        const simple = new Date(year, 0, 1 + (week - 1) * 7);
+        const dow = simple.getDay();
+        const start = new Date(simple);
+        
+        if (dow <= 4) start.setDate(simple.getDate() - simple.getDay() + 1);
+        else start.setDate(simple.getDate() + 8 - simple.getDay());
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        const options = { month: 'short', day: 'numeric' };
+        return `${start.toLocaleDateString(undefined, options)} - ${end.toLocaleDateString(undefined, options)}, ${year}`;
+    }
+
     // --- CORE ENGINE ---
     function renderEngine() {
         weeklyTotals = {};
         let totalUsed = 0, plannedImpact = 0;
 
         shifts.forEach(s => {
-            s.hours = computeHours(s.start, s.end);
+            if (s.hours === undefined || s.hours === null) {
+                s.hours = computeHours(s.start, s.end);
+            }
+            
             s.cost = s.type === 'hiwi' ? 0 : (s.hours <= 4.0 ? 0.5 : 1.0);
             s.weekKey = `${new Date(s.date).getFullYear()}-W${getISOWeek(s.date)}`;
             s.monthKey = s.date.substring(0, 7);
@@ -340,7 +427,7 @@
         const currentWeekKey = `${new Date().getFullYear()}-W${getISOWeek(new Date())}`;
         const curWeekData = weeklyTotals[currentWeekKey] || { hours: 0, isBreak: false };
         
-        document.getElementById('kpiWeekHours').textContent = `${curWeekData.hours.toFixed(1)}h`;
+        document.getElementById('kpiWeekHours').textContent = `${curWeekData.hours.toFixed(2)}h`;
         if (curWeekData.isBreak) {
             document.getElementById('kpiWeekLimit').textContent = "Semester Break (No Limit)";
             document.getElementById('kpiWeekHours').style.color = 'var(--warning)';
@@ -366,17 +453,19 @@
             if (fMonth !== 'all' && s.monthKey !== fMonth) return;
             if (fType !== 'all' && s.type !== fType) return;
 
+            const timeDisplay = (s.start && s.end) ? `<small>${s.start} - ${s.end}</small><br><strong>${s.hours}h</strong>` : `<strong>${s.hours}h</strong> <small>(Manual)</small>`;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${s.date}</td>
                 <td><span class="badge ${s.status === 'planned' ? 'badge-planned' : 'badge-werk'}">${s.status.toUpperCase()}</span></td>
                 <td><span class="badge ${s.type === 'hiwi' ? 'badge-hiwi' : 'badge-werk'}">${s.type.toUpperCase()}</span></td>
-                <td>${s.hours}h</td>
+                <td>${timeDisplay}</td>
                 <td>${s.cost} day</td>
                 <td>${s.isBreak ? '<span style="color:var(--warning)">Yes</span>' : 'No'}</td>
                 <td>
-                    <button class="btn-edit" onclick="editShift(${s.id})">Edit</button>
-                    <button class="btn-danger" onclick="deleteShift(${s.id})">Del</button>
+                    <button class="btn-edit btn-sm" onclick="editShift(${s.id})">Edit</button>
+                    <button class="btn-danger btn-sm" onclick="deleteShift(${s.id})">Del</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -416,7 +505,8 @@
                 let dayShifts = shifts.filter(s => s.date === currentStr);
                 let shiftsHTML = dayShifts.map(s => {
                     let c = s.status === 'planned' ? 'shift-block-planned' : (s.cost === 1.0 ? 'shift-block-full' : 'shift-block-half');
-                    return `<div class="cal-shift ${c}" draggable="true" ondragstart="dragStart(event, ${s.id})" title="${s.start}-${s.end}">${s.hours}h ${s.type.toUpperCase()}</div>`;
+                    let timeTip = (s.start && s.end) ? `${s.start}-${s.end}` : `Manual Entry`;
+                    return `<div class="cal-shift ${c}" draggable="true" ondragstart="dragStart(event, ${s.id})" title="${timeTip}">${s.hours}h ${s.type.toUpperCase()}</div>`;
                 }).join('');
 
                 htmlRow += `
@@ -437,7 +527,12 @@
 
     function renderChart() {
         const ctx = document.getElementById('weeklyChart').getContext('2d');
-        const labels = Object.keys(weeklyTotals).sort();
+        const labels = Object.keys(weeklyTotals).sort((a, b) => {
+            const [yearA, weekA] = a.split('-W').map(Number);
+            const [yearB, weekB] = b.split('-W').map(Number);
+            return yearA !== yearB ? yearA - yearB : weekA - weekB;
+        });
+        
         const data = labels.map(k => weeklyTotals[k].hours);
         const bgColors = labels.map(k => (!weeklyTotals[k].isBreak && weeklyTotals[k].hours > 20) ? 'rgba(248, 113, 113, 0.8)' : 'rgba(56, 189, 248, 0.8)');
 
@@ -448,7 +543,10 @@
             data: { labels: labels, datasets: [{ label: 'Hours Worked', data: data, backgroundColor: bgColors, borderRadius: 4 }] },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { annotation: { annotations: { line1: { type: 'line', yMin: 20, yMax: 20, borderColor: '#f87171', borderDash: [5, 5] } } } }
+                plugins: { 
+                    tooltip: { callbacks: { beforeTitle: function(context) { return getWeekDateRange(context[0].label); } } },
+                    annotation: { annotations: { line1: { type: 'line', yMin: 20, yMax: 20, borderColor: '#f87171', borderDash: [5, 5] } } } 
+                }
             }
         });
     }
@@ -481,7 +579,6 @@
         event.target.classList.add('active');
     }
 
-    // Drag and Drop Server Sync
     function dragStart(e, id) { e.dataTransfer.setData('text/plain', id); }
     function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
     function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
@@ -494,17 +591,24 @@
         
         if(shift) { 
             shift.date = dateStr; 
-            await saveShiftToDB(shift); // Send date update to Server
+            await saveShiftToDB(shift); 
         }
     }
 
-    // --- IMPORT / EXPORT (Server-Backed) ---
-    function exportData() {
-        // Grabs the data currently loaded from the database
-        const a = document.createElement('a');
-        a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shifts)); 
-        a.download = "visa_v4_server_backup.json"; 
-        a.click();
+    // --- IMPORT / EXPORT (Direct Database Sync) ---
+    async function exportData() {
+        try {
+            // Fetch fresh from API to ensure we get exact DB decimals without UI tampering
+            const res = await fetch('/api/shifts');
+            const rawData = await res.json();
+            
+            const a = document.createElement('a');
+            a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(rawData, null, 2)); 
+            a.download = "student_werk_tracker_backup.json"; 
+            a.click();
+        } catch (err) {
+            alert("Export failed to connect to database.");
+        }
     }
 
     function importData(e) {
@@ -517,18 +621,24 @@
                 const importedShifts = JSON.parse(event.target.result);
                 let successCount = 0;
 
-                // Loop through the imported JSON and send each shift to the server
                 for (let s of importedShifts) {
+                    
+                    // Safeguard: explicitly fetch precise hours, or fall back to compute
+                    let preciseHours = s.hours;
+                    if (preciseHours === undefined || preciseHours === null) {
+                        preciseHours = computeHours(s.start, s.end);
+                    }
+
                     const payload = {
                         status: s.status || 'logged',
                         type: s.type || 'werkstudent',
                         date: s.date,
-                        start: s.start || '09:00',
-                        end: s.end || '17:00',
+                        start: s.start === undefined ? '' : s.start, // strict check preserves blanks
+                        end: s.end === undefined ? '' : s.end,
+                        hours: parseFloat(preciseHours), // Preserves decimal precision perfectly
                         isBreak: s.isBreak || false
                     };
                     
-                    // Send to SQLite Database via POST (creates new records)
                     await fetch('/api/shifts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -537,7 +647,6 @@
                     successCount++;
                 }
 
-                // Reload the UI with the newly imported database records
                 await loadData();
                 alert(`Successfully imported ${successCount} shifts to the server database!`);
                 
@@ -545,8 +654,6 @@
                 console.error("Import error:", err);
                 alert("Failed to parse or import the JSON file.");
             }
-            
-            // Reset the file input so you can import the same file again if needed
             e.target.value = '';
         };
         reader.readAsText(file);
