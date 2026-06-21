@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  student-werk-tracker:
+    build: .
+    container_name: student_werk_tracker_app
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    volumes:
+      # Maps the local 'data' folder to the container's 'data' folder
+      - ./data:/app/data

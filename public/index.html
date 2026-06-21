@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Student Work Hours Analytics & Planner V4</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-main: #0f172a; --bg-card: #1e293b; --border: #334155;
+            --text-main: #f8fafc; --text-muted: #94a3b8;
+            --primary: #38bdf8; --primary-hover: #0ea5e9;
+            --success: #4ade80; --warning: #fbbf24; --danger: #f87171;
+            --exempt: #a78bfa; --planned: #f472b6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg-main); color: var(--text-main); padding: 2rem 1rem; line-height: 1.5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+        h1 { font-size: 1.75rem; color: var(--primary); }
+        h2 { font-size: 1.25rem; margin-bottom: 1rem; }
+
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .kpi-card { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+        .kpi-label { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+        .kpi-value { font-size: 1.75rem; font-weight: bold; margin-top: 0.5rem; }
+        .progress-bar-wrapper { background: #334155; border-radius: 999px; height: 8px; margin-top: 0.5rem; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s ease; }
+
+        .tabs { display: flex; gap: 1rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+        .tab-btn { background: transparent; color: var(--text-muted); border: none; padding: 0.75rem 1rem; cursor: pointer; font-weight: bold; border-bottom: 2px solid transparent; }
+        .tab-btn.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .panel { background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .form-group { margin-bottom: 0.5rem; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; color: var(--text-muted); }
+        input[type="text"], input[type="date"], input[type="time"], select { width: 100%; background-color: var(--bg-main); border: 1px solid var(--border); color: var(--text-main); border-radius: 4px; padding: 0.5rem; }
+        
+        button { background-color: var(--primary); color: var(--bg-main); border: none; padding: 0.5rem 1rem; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: var(--primary-hover); }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border); color: var(--text-main); }
+        .btn-danger { background-color: var(--danger); color: white; padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+        .btn-edit { background-color: var(--warning); color: #000; padding: 0.25rem 0.5rem; font-size: 0.75rem; margin-right: 0.25rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
+        th { color: var(--text-muted); }
+        .badge { padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: bold; }
+        .badge-werk { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+        .badge-hiwi { background: rgba(167, 139, 250, 0.15); color: var(--exempt); }
+        .badge-planned { background: rgba(244, 114, 182, 0.15); color: var(--planned); border: 1px dashed var(--planned); }
+
+        /* Calendar Grid */
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .calendar-grid { display: grid; grid-template-columns: 80px repeat(7, 1fr); gap: 4px; }
+        .cal-day-header { text-align: center; font-weight: bold; color: var(--text-muted); padding: 0.5rem; }
+        .cal-week-cell { background: rgba(255,255,255,0.02); display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.8rem; border-right: 2px solid var(--border); border-radius: 4px; padding: 0.25rem; text-align: center; }
+        .cal-week-cell strong { color: var(--primary); font-size: 0.9rem; }
+        .cal-cell { min-height: 90px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem; position: relative; cursor: pointer; transition: background 0.2s; }
+        .cal-cell:hover { border-color: var(--primary); }
+        .cal-cell.drag-over { background: rgba(56, 189, 248, 0.2); border-color: var(--primary); border-style: dashed; }
+        .cal-cell.disabled { opacity: 0.3; pointer-events: none; }
+        .cal-date { font-size: 0.8rem; color: var(--text-muted); position: absolute; top: 4px; right: 4px; pointer-events: none; }
+        
+        .cal-shift { font-size: 0.7rem; padding: 4px; border-radius: 4px; margin-top: 18px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; user-select: none; }
+        .cal-shift:active { cursor: grabbing; }
+        .shift-block-full { background: rgba(74, 222, 128, 0.2); border-left: 3px solid var(--success); }
+        .shift-block-half { background: rgba(251, 191, 36, 0.2); border-left: 3px solid var(--warning); }
+        .shift-block-planned { background: rgba(244, 114, 182, 0.1); border-left: 3px dashed var(--planned); }
+
+        .chart-container { height: 300px; margin-top: 1rem; }
+        .filter-bar { display: flex; gap: 1rem; align-items: center; background: var(--bg-main); padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+<header>
+        <div>
+            <h1>Pro Visa Analytics & Planner <span style="font-size:1rem; color:var(--success);">V4 (Cloud Synced)</span></h1>
+            <p style="color: var(--text-muted);">Data is saved to your Proxmox server's SQLite database.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-outline" onclick="exportData()">Export Backup</button>
+            <button class="btn-outline" onclick="document.getElementById('importFile').click()">Import JSON</button>
+            <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(event)">
+        </div>
+    </header>
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Yearly Visa Days Used</div>
+            <div class="kpi-value"><span id="kpiDaysUsed">0</span> / 140</div>
+            <div class="progress-bar-wrapper"><div id="kpiProgress" class="progress-bar-fill"></div></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Days Remaining</div>
+            <div class="kpi-value" id="kpiDaysLeft" style="color: var(--success);">140</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Current Week Total</div>
+            <div class="kpi-value" id="kpiWeekHours">0h</div>
+            <div id="kpiWeekLimit" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Limit: 20h</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Planned Shifts Impact</div>
+            <div class="kpi-value" id="kpiPlannedImpact" style="color: var(--planned);">0 Days</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Log / Edit Shift</h2>
+        <form id="shiftForm" class="form-grid">
+            <div class="form-group">
+                <label>Status</label>
+                <select id="statusType">
+                    <option value="logged">Logged (Already Worked)</option>
+                    <option value="planned">Planned (Future Mockup)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Job Type</label>
+                <select id="jobType">
+                    <option value="werkstudent">Werkstudent (Costs Visa Days)</option>
+                    <option value="hiwi">HiWi / Uni (Exempt)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" id="shiftDate" required>
+            </div>
+            <div class="form-group">
+                <label>Start Time</label>
+                <input type="time" id="startTime" value="09:00" required>
+            </div>
+            <div class="form-group">
+                <label>End Time</label>
+                <input type="time" id="endTime" value="17:00" required>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                <input type="checkbox" id="isBreak" style="width: auto; transform: scale(1.2);">
+                <label for="isBreak" style="margin: 0; cursor: pointer; color: var(--warning); font-weight: bold;">Semester Break / Lecture-free Period (Exempt from 20h limit)</label>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <button type="submit" id="submitBtn" style="width: 100%;">Save Shift to Server</button>
+                <button type="button" id="cancelEditBtn" class="btn-outline" style="width: 100%; margin-top: 0.5rem; display: none;" onclick="cancelEdit()">Cancel Edit</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('calendar')">Interactive Planner (Drag & Drop)</button>
+        <button class="tab-btn" onclick="switchTab('matrix')">Matrix & Filters</button>
+        <button class="tab-btn" onclick="switchTab('analytics')">Trend Analytics</button>
+    </div>
+
+    <div id="calendar" class="tab-content active panel">
+        <div class="calendar-header">
+            <button class="btn-outline" onclick="changeMonth(-1)">&larr; Prev</button>
+            <h3 id="calMonthDisplay">Month Year</h3>
+            <button class="btn-outline" onclick="changeMonth(1)">Next &rarr;</button>
+        </div>
+        <div class="calendar-grid">
+            <div class="cal-day-header" style="font-size: 0.8rem;">Week Stats</div>
+            <div class="cal-day-header">Mon</div><div class="cal-day-header">Tue</div><div class="cal-day-header">Wed</div>
+            <div class="cal-day-header">Thu</div><div class="cal-day-header">Fri</div><div class="cal-day-header">Sat</div><div class="cal-day-header">Sun</div>
+        </div>
+        <div class="calendar-grid" id="calDaysGrid">
+            </div>
+    </div>
+
+    <div id="matrix" class="tab-content panel">
+        <div class="filter-bar">
+            <strong>Filters:</strong>
+            <select id="filterMonth" onchange="renderEngine()"><option value="all">All Months</option></select>
+            <select id="filterType" onchange="renderEngine()">
+                <option value="all">All Job Types</option>
+                <option value="werkstudent">Werkstudent Only</option>
+                <option value="hiwi">HiWi Only</option>
+            </select>
+        </div>
+        
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Type</th>
+                    <th>Hours</th>
+                    <th>Visa Impact</th>
+                    <th>Break?</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="dataBody"></tbody>
+        </table>
+    </div>
+
+    <div id="analytics" class="tab-content panel">
+        <h3>Weekly Burn Rate (20h Limit Check)</h3>
+        <div class="chart-container"><canvas id="weeklyChart"></canvas></div>
+    </div>
+</div>
+
+<script>
+    // --- STATE MANAGEMENT ---
+    let shifts = [];
+    let currentCalDate = new Date();
+    let weeklyChartInstance = null;
+    let editingId = null;
+    let weeklyTotals = {};
+
+    // --- API CALLS (Database Sync) ---
+    async function loadData() {
+        try {
+            const response = await fetch('/api/shifts');
+            shifts = await response.json();
+            renderEngine();
+        } catch (error) {
+            console.error("Failed to load data:", error);
+            alert("Could not connect to the database server.");
+        }
+    }
+
+    async function saveShiftToDB(payload) {
+        try {
+            const method = payload.id ? 'PUT' : 'POST';
+            const url = payload.id ? `/api/shifts/${payload.id}` : '/api/shifts';
+            
+            await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            await loadData(); // Reload from DB to ensure local state sync
+        } catch (error) {
+            console.error("Save error:", error);
+            alert("Failed to save to server.");
+        }
+    }
+
+    async function deleteShift(id) {
+        if (!confirm("Are you sure you want to delete this shift?")) return;
+        try {
+            await fetch(`/api/shifts/${id}`, { method: 'DELETE' });
+            await loadData();
+        } catch (error) {
+            console.error("Delete error:", error);
+        }
+    }
+
+    // --- FORM SUBMISSION ---
+    document.getElementById('shiftForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const payload = {
+            status: document.getElementById('statusType').value,
+            type: document.getElementById('jobType').value,
+            date: document.getElementById('shiftDate').value,
+            start: document.getElementById('startTime').value,
+            end: document.getElementById('endTime').value,
+            isBreak: document.getElementById('isBreak').checked
+        };
+
+        if (editingId) payload.id = editingId;
+        
+        await saveShiftToDB(payload);
+        cancelEdit();
+    });
+
+    function editShift(id) {
+        const s = shifts.find(x => x.id === id);
+        if (!s) return;
+        document.getElementById('statusType').value = s.status;
+        document.getElementById('jobType').value = s.type;
+        document.getElementById('shiftDate').value = s.date;
+        document.getElementById('startTime').value = s.start;
+        document.getElementById('endTime').value = s.end;
+        document.getElementById('isBreak').checked = s.isBreak || false;
+        
+        editingId = id;
+        document.getElementById('submitBtn').textContent = 'Update Shift on Server';
+        document.getElementById('cancelEditBtn').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+        editingId = null;
+        document.getElementById('submitBtn').textContent = 'Save Shift to Server';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+        document.getElementById('shiftForm').reset();
+    }
+
+    // --- HELPER FUNCTIONS ---
+    function computeHours(start, end) {
+        const [sh, sm] = start.split(':').map(Number);
+        const [eh, em] = end.split(':').map(Number);
+        let diff = (eh + em/60) - (sh + sm/60);
+        if (diff < 0) diff += 24;
+        return parseFloat(diff.toFixed(2));
+    }
+
+    function getISOWeek(dateStr) {
+        const d = new Date(dateStr);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+        const week1 = new Date(d.getFullYear(), 0, 4);
+        return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+    }
+
+    // --- CORE ENGINE ---
+    function renderEngine() {
+        weeklyTotals = {};
+        let totalUsed = 0, plannedImpact = 0;
+
+        shifts.forEach(s => {
+            s.hours = computeHours(s.start, s.end);
+            s.cost = s.type === 'hiwi' ? 0 : (s.hours <= 4.0 ? 0.5 : 1.0);
+            s.weekKey = `${new Date(s.date).getFullYear()}-W${getISOWeek(s.date)}`;
+            s.monthKey = s.date.substring(0, 7);
+            
+            if (s.status === 'logged') totalUsed += s.cost;
+            if (s.status === 'planned') plannedImpact += s.cost;
+            
+            if (!weeklyTotals[s.weekKey]) weeklyTotals[s.weekKey] = { hours: 0, isBreak: false };
+            weeklyTotals[s.weekKey].hours += s.hours;
+            if (s.isBreak) weeklyTotals[s.weekKey].isBreak = true;
+        });
+
+        shifts.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        document.getElementById('kpiDaysUsed').textContent = totalUsed;
+        document.getElementById('kpiDaysLeft').textContent = (140 - totalUsed).toFixed(1);
+        document.getElementById('kpiPlannedImpact').textContent = `${plannedImpact} Days`;
+        document.getElementById('kpiProgress').style.width = `${Math.min((totalUsed/140)*100, 100)}%`;
+
+        const currentWeekKey = `${new Date().getFullYear()}-W${getISOWeek(new Date())}`;
+        const curWeekData = weeklyTotals[currentWeekKey] || { hours: 0, isBreak: false };
+        
+        document.getElementById('kpiWeekHours').textContent = `${curWeekData.hours.toFixed(1)}h`;
+        if (curWeekData.isBreak) {
+            document.getElementById('kpiWeekLimit').textContent = "Semester Break (No Limit)";
+            document.getElementById('kpiWeekHours').style.color = 'var(--warning)';
+        } else {
+            document.getElementById('kpiWeekLimit').textContent = "Limit: 20h";
+            document.getElementById('kpiWeekHours').style.color = curWeekData.hours > 20 ? 'var(--danger)' : 'var(--text-main)';
+        }
+
+        populateMonthFilter();
+        renderTable();
+        renderCalendar();
+        renderChart();
+    }
+
+    // --- VIEW RENDERING ---
+    function renderTable() {
+        const fMonth = document.getElementById('filterMonth').value;
+        const fType = document.getElementById('filterType').value;
+        const tbody = document.getElementById('dataBody');
+        tbody.innerHTML = '';
+
+        shifts.forEach((s) => {
+            if (fMonth !== 'all' && s.monthKey !== fMonth) return;
+            if (fType !== 'all' && s.type !== fType) return;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${s.date}</td>
+                <td><span class="badge ${s.status === 'planned' ? 'badge-planned' : 'badge-werk'}">${s.status.toUpperCase()}</span></td>
+                <td><span class="badge ${s.type === 'hiwi' ? 'badge-hiwi' : 'badge-werk'}">${s.type.toUpperCase()}</span></td>
+                <td>${s.hours}h</td>
+                <td>${s.cost} day</td>
+                <td>${s.isBreak ? '<span style="color:var(--warning)">Yes</span>' : 'No'}</td>
+                <td>
+                    <button class="btn-edit" onclick="editShift(${s.id})">Edit</button>
+                    <button class="btn-danger" onclick="deleteShift(${s.id})">Del</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderCalendar() {
+        const grid = document.getElementById('calDaysGrid');
+        grid.innerHTML = '';
+        
+        const year = currentCalDate.getFullYear();
+        const month = currentCalDate.getMonth();
+        document.getElementById('calMonthDisplay').textContent = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+        let calStart = new Date(year, month, 1);
+        let startDay = (calStart.getDay() + 6) % 7; 
+        calStart.setDate(calStart.getDate() - startDay);
+
+        for (let w = 0; w < 6; w++) {
+            let weekDate = new Date(calStart); 
+            let weekKey = `${weekDate.getFullYear()}-W${getISOWeek(weekDate)}`;
+            let wData = weeklyTotals[weekKey] || { hours: 0, isBreak: false };
+            
+            let limitTxt = wData.isBreak ? 'Break' : `${Math.max(0, 20 - wData.hours).toFixed(1)}h left`;
+            let color = (!wData.isBreak && wData.hours > 20) ? 'var(--danger)' : 'var(--text-muted)';
+            
+            let htmlRow = `<div class="cal-week-cell">
+                <strong>W${getISOWeek(weekDate)}</strong>
+                <span style="color:${color}; margin-top:4px;">${wData.hours.toFixed(1)}h</span>
+                <span style="font-size:0.7rem; color:var(--text-muted);">${limitTxt}</span>
+            </div>`;
+
+            for (let d = 0; d < 7; d++) {
+                let currentStr = `${calStart.getFullYear()}-${String(calStart.getMonth() + 1).padStart(2, '0')}-${String(calStart.getDate()).padStart(2, '0')}`;
+                let isCurrentMonth = calStart.getMonth() === month;
+                
+                let dayShifts = shifts.filter(s => s.date === currentStr);
+                let shiftsHTML = dayShifts.map(s => {
+                    let c = s.status === 'planned' ? 'shift-block-planned' : (s.cost === 1.0 ? 'shift-block-full' : 'shift-block-half');
+                    return `<div class="cal-shift ${c}" draggable="true" ondragstart="dragStart(event, ${s.id})" title="${s.start}-${s.end}">${s.hours}h ${s.type.toUpperCase()}</div>`;
+                }).join('');
+
+                htmlRow += `
+                    <div class="cal-cell ${isCurrentMonth ? '' : 'disabled'}" 
+                         ondragover="allowDrop(event)" 
+                         ondragleave="dragLeave(event)"
+                         ondrop="drop(event, '${currentStr}')"
+                         onclick="quickPlan(event, '${currentStr}')">
+                        <div class="cal-date">${calStart.getDate()}</div>
+                        ${shiftsHTML}
+                    </div>`;
+                
+                calStart.setDate(calStart.getDate() + 1);
+            }
+            grid.innerHTML += htmlRow;
+        }
+    }
+
+    function renderChart() {
+        const ctx = document.getElementById('weeklyChart').getContext('2d');
+        const labels = Object.keys(weeklyTotals).sort();
+        const data = labels.map(k => weeklyTotals[k].hours);
+        const bgColors = labels.map(k => (!weeklyTotals[k].isBreak && weeklyTotals[k].hours > 20) ? 'rgba(248, 113, 113, 0.8)' : 'rgba(56, 189, 248, 0.8)');
+
+        if (weeklyChartInstance) weeklyChartInstance.destroy();
+
+        weeklyChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Hours Worked', data: data, backgroundColor: bgColors, borderRadius: 4 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { annotation: { annotations: { line1: { type: 'line', yMin: 20, yMax: 20, borderColor: '#f87171', borderDash: [5, 5] } } } }
+            }
+        });
+    }
+
+    // --- INTERACTIONS & DRAG DROP ---
+    function quickPlan(e, dateStr) {
+        if(e.target.classList.contains('cal-shift')) return;
+        document.getElementById('shiftDate').value = dateStr;
+        document.getElementById('statusType').value = 'planned';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function changeMonth(offset) {
+        currentCalDate.setMonth(currentCalDate.getMonth() + offset);
+        renderCalendar();
+    }
+
+    function populateMonthFilter() {
+        const select = document.getElementById('filterMonth');
+        const currentVal = select.value;
+        const months = [...new Set(shifts.map(s => s.monthKey))].sort().reverse();
+        select.innerHTML = '<option value="all">All Months</option>';
+        months.forEach(m => select.innerHTML += `<option value="${m}">${m}</option>`);
+        select.value = currentVal;
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content, .tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.target.classList.add('active');
+    }
+
+    // Drag and Drop Server Sync
+    function dragStart(e, id) { e.dataTransfer.setData('text/plain', id); }
+    function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+    function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+    
+    async function drop(e, dateStr) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        const id = parseFloat(e.dataTransfer.getData('text/plain'));
+        const shift = shifts.find(s => s.id === id);
+        
+        if(shift) { 
+            shift.date = dateStr; 
+            await saveShiftToDB(shift); // Send date update to Server
+        }
+    }
+
+    // --- IMPORT / EXPORT (Server-Backed) ---
+    function exportData() {
+        // Grabs the data currently loaded from the database
+        const a = document.createElement('a');
+        a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(shifts)); 
+        a.download = "visa_v4_server_backup.json"; 
+        a.click();
+    }
+
+    function importData(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const importedShifts = JSON.parse(event.target.result);
+                let successCount = 0;
+
+                // Loop through the imported JSON and send each shift to the server
+                for (let s of importedShifts) {
+                    const payload = {
+                        status: s.status || 'logged',
+                        type: s.type || 'werkstudent',
+                        date: s.date,
+                        start: s.start || '09:00',
+                        end: s.end || '17:00',
+                        isBreak: s.isBreak || false
+                    };
+                    
+                    // Send to SQLite Database via POST (creates new records)
+                    await fetch('/api/shifts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    successCount++;
+                }
+
+                // Reload the UI with the newly imported database records
+                await loadData();
+                alert(`Successfully imported ${successCount} shifts to the server database!`);
+                
+            } catch (err) {
+                console.error("Import error:", err);
+                alert("Failed to parse or import the JSON file.");
+            }
+            
+            // Reset the file input so you can import the same file again if needed
+            e.target.value = '';
+        };
+        reader.readAsText(file);
+    }
+
+    // Initialize UI
+    document.getElementById('shiftDate').valueAsDate = new Date();
+    loadData();
+</script>
+</body>
+</html>
